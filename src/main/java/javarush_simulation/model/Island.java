@@ -1,4 +1,4 @@
-package javarush_simulation;
+package javarush_simulation.model;
 
 
 public class Island {
