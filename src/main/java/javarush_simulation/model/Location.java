@@ -1,7 +1,8 @@
-package javarush_simulation;
+package javarush_simulation.model;
 
-import javarush_simulation.Entity.Animal;
+import javarush_simulation.Entity.Animal.Animal;
 import javarush_simulation.Entity.Plant;
+import lombok.Getter;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -11,6 +12,7 @@ public class Location {
     @Getter
 
     private final List<Animal> animals = new CopyOnWriteArrayList<>();
+    @Getter
     private final List<Plant> plants = new CopyOnWriteArrayList<>();
 
     public void addAnimal(Animal animal){
@@ -37,11 +39,6 @@ public class Location {
             }
             return null;
         }
-    }
-
-    public List<Plant> getPlants() {
-        return plants;
-
     }
 
 }
