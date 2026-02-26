@@ -16,7 +16,8 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public abstract class Animal {
 
-    private static final CHANCE_OF_REPRODUCTION = 30;
+
+    private static final int CHANCE_OF_REPRODUCTION = 30;
     protected int speed = 1;
     protected double weight;
     protected double currentSatiety;
