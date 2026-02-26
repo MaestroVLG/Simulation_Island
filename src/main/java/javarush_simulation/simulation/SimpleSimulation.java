@@ -107,12 +107,13 @@ public class SimpleSimulation {
                     }
                 }
             }
-            printStatistics();
+        }
 
+        printStatistics();
 
         }
 
-        public void printStatistics () {
+        public void printStatistics() {
             int wolves = 0;
             int rabbit = 0;
             int deer = 0;
