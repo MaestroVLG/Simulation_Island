@@ -1,18 +1,46 @@
 package javarush_simulation;
 
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-public class App {
-    public static void main(String[] args) {
-        //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-        // to see how IntelliJ IDEA suggests fixing it.
-        System.out.printf("Hello and welcome!");
+import javarush_simulation.config.SimulationConfig;
+import javarush_simulation.simulation.SimpleSimulation;
+import lombok.extern.slf4j.Slf4j;
 
-        for (int i = 1; i <= 5; i++) {
-            //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-            // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-            System.out.println("i = " + i);
+
+@Slf4j
+public class App {
+    private static final int SIMPLE_SIMULATION_TIKS = 10;
+
+    public static void main(String[] args) {
+
+        SimulationConfig config = SimulationConfig.builder()
+                .islandWidth(5) // Размеры Леса (ширина)
+                .islandHeigth(5) // Размера Леса (высота)
+                .innitiaslisationWolves(2) // Популяция Волков
+                .innitiaslisationRabbits(10) // Популяция Кроликов
+                .innitiaslisationDeer(5) // Популяция Оленей
+                .plantsPerCell(1) // Число растений на 1 ячейку
+                .build();
+
+
+        //Однопоточная симуляция
+
+        SimpleSimulation simpleSimulation = new SimpleSimulation(config);
+        simpleSimulation.initialize();
+
+        //Вывод сконфигурированного состояния: err, info, debug;
+        log.info("Начальное состояние симуляции: ");
+        simpleSimulation.printStatistics();
+
+        try {
+            simpleSimulation.run(SIMPLE_SIMULATION_TIKS);
+        }catch (InterruptedException e){
+            log.error("ошибка при работе simplesimulation");
+            throw new RuntimeException(e);
         }
+
+        log.info("Работа симуляции завершена!");
+
+
+
     }
 }
