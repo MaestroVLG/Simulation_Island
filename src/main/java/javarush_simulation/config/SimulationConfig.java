@@ -1,24 +1,17 @@
 package javarush_simulation.config;
 
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 
-@Data
+@Getter
 @Builder
-
 public class SimulationConfig {
-    private int islandWidth;
-    private int islandHeigth;
-    
-    private int innitiaslisationWolves;
-    private int innitiaslisationRabbits;
-    private int innitiaslisationDeer;
-
-    private int plantsPerCell;
-
-    private long tickDurationMs;
-
-    
-    
-    
+    private final int islandWidth;
+    private final int islandHeight;
+    private final int initialWolves;
+    private final int initialRabbits;
+    private final int initialDeer;
+    private final int plantsPerCell;
+    private final long tickDelayMs;
+    private final long tickDurationMs;
 }

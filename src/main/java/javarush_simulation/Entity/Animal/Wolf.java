@@ -43,9 +43,7 @@ public class Wolf extends Animal{
 
     }
 
-    public void move(Island island, int currentX, int currentY){
-        //todo пока заглушка
-    }
+
 
     public void reproduce(Location location){
         //todo пока заглушка

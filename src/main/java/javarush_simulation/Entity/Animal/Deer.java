@@ -24,15 +24,13 @@ public class Deer extends Animal{
 
         Plant plant = location.removePlant();
         if(plant != null){
-            currentSatiety = Math.min(maxSatiety, currentSatiety + plant.getWeight(());
+            currentSatiety = Math.min(maxSatiety, currentSatiety + plant.getWeight());
             log.debug("Олень съел растение");
         }
 
     }
 
-    public void move(Island island, int currentX, int currentY){
-        // todo пока заглушка
-    }
+
 
     public void reproduce(Location location){
         // todo пока заглушка

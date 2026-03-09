@@ -79,16 +79,16 @@ public void move(Island island, int currentX, int currentY) {
     int newY = currentY;
 
     switch (direction) {
-        case 0:
+        case 0: // вверх
             newY = Math.max(0, currentY - 1);
             break;
-        case 1:
-            newX = Math.min(island.getWith() - 1, currentY + 1);
+        case 1: // вправо
+            newX = Math.min(island.getWidth() - 1, currentX + 1);
             break;
-        case 2:
+        case 2: // вниз
             newY = Math.min(island.getHeight() - 1, currentY + 1);
             break;
-        case 3:
+        case 3: // влево
             newX = Math.max(0, currentX - 1);
             break;
     }

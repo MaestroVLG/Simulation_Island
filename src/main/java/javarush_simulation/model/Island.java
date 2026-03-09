@@ -1,9 +1,12 @@
 package javarush_simulation.model;
 
 
-public class Island {
+import lombok.Getter;
 
+public class Island {
+    @Getter
     private final int width;
+    @Getter
     private final int height;
 
     private final Location[][] locations;
