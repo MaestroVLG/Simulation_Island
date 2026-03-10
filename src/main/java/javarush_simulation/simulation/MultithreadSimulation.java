@@ -1,174 +1,198 @@
 package javarush_simulation.simulation;
 
 import javarush_simulation.Entity.Animal.Animal;
-import javarush_simulation.Entity.Animal.Deer;
-import javarush_simulation.Entity.Animal.Rabbit;
-import javarush_simulation.Entity.Animal.Wolf;
 import javarush_simulation.Entity.Plant;
 import javarush_simulation.config.SimulationConfig;
 import javarush_simulation.model.Island;
 import javarush_simulation.model.Location;
+import javarush_simulation.Entity.Animal.factory.AnimalFactory;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.*;
 
+import static java.util.stream.Collectors.*;
+
+/**
+ * Многопоточная симуляция экосистемы.
+ * Управляет жизненным циклом животных, ростом растений и статистикой.
+ */
 @Slf4j
 public class MultithreadSimulation {
-    private static final int CORE_POOL_SIZE = 1;
-    private static final int THREADS = 10;
     private final Island island;
     private final SimulationConfig config;
-    private final ExecutorService workerPool = Executors.newFixedThreadPool(THREADS);
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(CORE_POOL_SIZE);
+
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
+    private final ExecutorService workerPool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+
     private volatile boolean running = true;
 
-
     public MultithreadSimulation(SimulationConfig config) {
-        this.island = new Island(config.getIslandWidth(), config.getIslandHeight());
         this.config = config;
-
+        this.island = new Island(config.getIslandWidth(), config.getIslandHeight());
     }
 
+    /**
+     * Инициализация: размещение животных и растений на острове.
+     */
     public void initialize() {
+        log.info("Инициализация симуляции... Остров {}x{}", island.getWidth(), island.getHeight());
 
-        // Волки
-        for (int i = 0; i < config.getInitialWolves(); i++) {
-            int x = ThreadLocalRandom.current().nextInt(config.getIslandWidth());
-            int y = ThreadLocalRandom.current().nextInt(config.getIslandHeight());
-            Wolf wolf = new Wolf();
-            island.getLocation(x, y).addAnimal(wolf);
-
-
-        }
-
-        // Кролики
-        for (int i = 0; i < config.getInitialRabbits(); i++) {
-            int x = ThreadLocalRandom.current().nextInt(config.getIslandWidth());
-            int y = ThreadLocalRandom.current().nextInt(config.getIslandHeight());
-            Rabbit rabbit = new Rabbit();
-            island.getLocation(x, y).addAnimal(rabbit);
-        }
-
-        // Олени
-        for (int i = 0; i < config.getInitialDeer(); i++) {
-            int x = ThreadLocalRandom.current().nextInt(config.getIslandWidth());
-            int y = ThreadLocalRandom.current().nextInt(config.getIslandHeight());
-            Deer deer = new Deer();
-            island.getLocation(x, y).addAnimal(deer);
-
-
-        }
-
-        //Растения
-
-        for (int y = 0; y < island.getHeight(); y++) {
-            for (int x = 0; x < island.getWidth(); x++) {
-                Location location = island.getLocation(x, y);
-                for (int p = 0; p < 5; p++) {
-                    location.addPlant(new Plant());
-                }
-
+        // Размещаем всех животных
+        for (Class<? extends Animal> animalType : SimulationConfig.getAnimalTypes()) {
+            int count = config.getInitialCount(animalType);
+            for (int i = 0; i < count; i++) {
+                int x = ThreadLocalRandom.current().nextInt(config.getIslandWidth());
+                int y = ThreadLocalRandom.current().nextInt(config.getIslandHeight());
+                Animal animal = AnimalFactory.create(animalType);
+                island.getLocation(x, y).addAnimal(animal);
             }
         }
-        log.info("Инициализация завершена. Животные и растения размещены");
+
+        // Размещаем растения
+        for (int x = 0; x < island.getWidth(); x++) {
+            for (int y = 0; y < island.getHeight(); y++) {
+                Location loc = island.getLocation(x, y);
+                for (int i = 0; i < config.getInitialPlantsPerCell(); i++) {
+                    loc.addPlant(new Plant());
+                }
+            }
+        }
+
+        log.info("Инициализация завершена. Животные и растения размещены.");
+        printStatistics();
     }
 
-    private void tick() {
-        for (int y = 0; y < island.getHeight(); y++) {
-            for (int x = 0; x < island.getWidth(); x++) {
-                Location location = island.getLocation(x, y);
-                for (int i = 0; i < config.getPlantsPerCell(); i++) {
-                    location.addPlant(new Plant());
+    /**
+     * Запуск симуляции.
+     */
+    public void start() {
+        if (!running) return;
+
+        log.info("Запуск симуляции. Такт каждые {} мс", config.getTickIntervalMs());
+
+        // Задача 1: Рост растений
+        scheduler.scheduleAtFixedRate(this::growPlants, 0, config.getTickIntervalMs(), TimeUnit.MILLISECONDS);
+
+        // Задача 2: Жизненный цикл животных
+        scheduler.scheduleAtFixedRate(this::processAnimals, 0, config.getTickIntervalMs(), TimeUnit.MILLISECONDS);
+
+        // Задача 3: Статистика
+        scheduler.scheduleAtFixedRate(this::printStatistics,
+                0, config.getTickIntervalMs() * 2, TimeUnit.MILLISECONDS);
+
+        // Автоматическая остановка
+        scheduler.schedule(this::stop, config.getTickIntervalMs() * config.getSimulationTicks(), TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Рост растений на всех локациях.
+     */
+    private void growPlants() {
+        for (int x = 0; x < island.getWidth(); x++) {
+            for (int y = 0; y < island.getHeight(); y++) {
+                Location loc = island.getLocation(x, y);
+                synchronized (loc) {
+                    for (int i = 0; i < config.getPlantsGrowthPerTick(); i++) {
+                        if (loc.getPlantCount() < 200) {
+                            loc.addPlant(new Plant());
+                        }
+                    }
                 }
             }
         }
+    }
 
+    /**
+     * Обработка жизненного цикла всех животных (в многопоточном режиме).
+     */
+    private void processAnimals() {
         List<Callable<Void>> tasks = new ArrayList<>();
-        for (int y = 0; y < island.getHeight(); y++) {
-            for (int x = 0; x < island.getWidth(); x++) {
-                Location location = island.getLocation(x, y);
-                int finalX = x;
-                int finalY = y;
-                for (Animal animal : location.getAnimals()) {
-                    if (!animal.isAlive()) {
-                        continue;
-                    }
 
+        for (int x = 0; x < island.getWidth(); x++) {
+            for (int y = 0; y < island.getHeight(); y++) {
+                Location loc = island.getLocation(x, y);
+                List<Animal> animals = new ArrayList<>(loc.getAnimals()); // безопасная копия
+
+                for (Animal animal : animals) {
+                    int finalX = x;
+                    int finalY = y;
                     tasks.add(() -> {
-                        animal.eat(animal.getCurrentLocation());
+                        if (!animal.isAlive()) return null;
+
+                        animal.eat(loc);
+                        animal.reproduce(loc);
                         animal.move(island, finalX, finalY);
-                        animal.reproduce(animal.getCurrentLocation());
-                        animal.setCurrentSatiety(animal.getCurrentSatiety() - 1);
-                        if (animal.getCurrentSatiety() <= 0) {
-                            animal.die();
-                            animal.getCurrentLocation().removeAnimal(animal);
-                        }
+                        animal.starve();
+
                         return null;
-
-
                     });
-
                 }
-
             }
-
         }
 
         try {
-            List<Future<Void>> futures = workerPool.invokeAll(tasks); //отправляем действия в пул рабочих потоков
-            for (Future<Void> f : futures) {
-                f.get();
-            }
+            workerPool.invokeAll(tasks);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.error("Такт прерван");
-        } catch (ExecutionException e) {
-            log.error("Ошибка при выполнении задачи животного", e.getCause());
+            log.error("Потоки обработки животных прерваны");
         }
-        printStatistics();
-
     }
 
+    /**
+     * Вывод статистики по популяциям.
+     */
     public void printStatistics() {
-        int wolves = 0;
-        int rabbits = 0;
-        int deer = 0;
-        int plants = 0;
-        for (int y = 0; y < island.getHeight(); y++) {
-            for (int x = 0; x < island.getWidth(); x++) {
-                Location location = island.getLocation(x, y);
-                for (Animal animal : location.getAnimals()) {
-                    if (animal instanceof Wolf) wolves++;
-                    else if (animal instanceof Rabbit) rabbits++;
-                    else if (animal instanceof Deer) deer++;
-                }
-                plants += location.getPlants().size();
+        Map<String, Long> stats = new HashMap<>();
+        int plantCount = 0;
+
+        for (int x = 0; x < island.getWidth(); x++) {
+            for (int y = 0; y < island.getHeight(); y++) {
+                Location loc = island.getLocation(x, y);
+                plantCount += loc.getPlantCount();
+
+                loc.getAnimals().stream()
+                        .filter(Animal::isAlive)
+                        .collect(groupingBy(Object::toString, counting()))
+                        .forEach((name, count) -> stats.merge(name, count, Long::sum));
             }
-
-
-
         }
-        log.info("Статистика: Волки = {}, Кролики = {}, Олени = {}, Растения = {}", wolves, rabbits, deer, plants);
 
-}
+        log.info("📊 Статистика: {}", formatStats(stats, plantCount));
+    }
 
-public void start() {
-    scheduler.scheduleAtFixedRate(() -> {
-        if (running) {
-            tick();
+    private String formatStats(Map<String, Long> stats, int plantCount) {
+        StringBuilder sb = new StringBuilder();
+        stats.forEach((k, v) -> sb.append(k).append("=").append(v).append(" "));
+        sb.append("Растения=").append(plantCount);
+        return sb.toString();
+    }
+
+    /**
+     * Остановка симуляции.
+     */
+    public void stop() {
+        if (!running) return;
+        running = false;
+
+        log.info("Остановка симуляции...");
+
+        scheduler.shutdown();
+        workerPool.shutdown();
+
+        try {
+            if (!workerPool.awaitTermination(2, TimeUnit.SECONDS)) {
+                workerPool.shutdownNow();
+            }
+            if (!scheduler.awaitTermination(2, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            workerPool.shutdownNow();
+            scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
         }
-    }, 0, config.getTickDurationMs(), TimeUnit.MILLISECONDS);
-    log.info("Симуляция запущена с тактом {} мс", config.getTickDurationMs());
-}
 
-public void stop() {
-    running = false;
-    scheduler.shutdown();
-    workerPool.shutdown();
-    log.info("Симуляция остановлена!");
+        log.info("Симуляция остановлена.");
+    }
 }
-}
-
-

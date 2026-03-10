@@ -2,49 +2,79 @@ package javarush_simulation.model;
 
 import javarush_simulation.Entity.Animal.Animal;
 import javarush_simulation.Entity.Plant;
-import lombok.Getter;
 
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * Локация (клетка острова), содержащая животных и растения.
+ * Потокобезопасна: использует CopyOnWriteArrayList для животных и synchronized блоки для растений.
+ */
 public class Location {
-
-    @Getter
-    private final List<Animal> animals = new CopyOnWriteArrayList<>(); // можно оставить — add/remove через итератор безопасны
-
-    // Заменяем CopyOnWriteArrayList на synchronizedList
+    private final List<Animal> animals = new CopyOnWriteArrayList<>();
     private final List<Plant> plants = Collections.synchronizedList(new ArrayList<>());
+    private final Object plantLock = new Object();
 
+    /**
+     * Добавляет животное в локацию, если не превышен лимит.
+     */
     public void addAnimal(Animal animal) {
-        animals.add(animal);
-        animal.setCurrentLocation(this);
-    }
-
-    public void removeAnimal(Animal animal) {
-        animals.remove(animal);
-    }
-
-    public void addPlant(Plant plant) {
-        plants.add(plant);
-    }
-
-
-    public Plant removePlant() {
-        synchronized (plants) { // обязательно синхронизируем блок!
-            if (!plants.isEmpty()) {
-                return plants.remove(plants.size() - 1); // теперь работает
-            }
-            return null;
+        if (animals.size() < animal.getMaxPerCell()) {
+            animals.add(animal);
+            animal.setCurrentLocation(this);
         }
     }
 
     /**
-     * Возвращает НЕИЗМЕНЯЕМУЮ копию списка растений
-     * Чтобы избежать ConcurrentModificationException при итерации
+     * Удаляет животное из локации.
+     */
+    public void removeAnimal(Animal animal) {
+        animals.remove(animal);
+    }
+
+    /**
+     * Добавляет растение, если не превышен лимит (200).
+     */
+    public void addPlant(Plant plant) {
+        synchronized (plantLock) {
+            if (plants.size() < 200) {
+                plants.add(plant);
+            }
+        }
+    }
+
+    /**
+     * Удаляет одно растение (если есть).
+     * @return удалённое растение или null
+     */
+    public Plant removePlant() {
+        synchronized (plantLock) {
+            return plants.isEmpty() ? null : plants.remove(0);
+        }
+    }
+
+    /**
+     * Возвращает копию списка животных для безопасной итерации.
+     */
+    public List<Animal> getAnimals() {
+        return new ArrayList<>(animals);
+    }
+
+    /**
+     * Возвращает копию списка растений.
      */
     public List<Plant> getPlants() {
-        synchronized (plants) {
-            return new ArrayList<>(plants); // безопасная копия
+        synchronized (plantLock) {
+            return new ArrayList<>(plants);
+        }
+    }
+
+    /**
+     * Получить количество растений.
+     */
+    public int getPlantCount() {
+        synchronized (plantLock) {
+            return plants.size();
         }
     }
 }
